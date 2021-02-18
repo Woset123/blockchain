@@ -1,0 +1,133 @@
+import time
+import json
+import copy
+from block import Block
+from transaction import Transaction
+
+
+class Blockchain:
+  
+# =============================================================================
+#     
+# =============================================================================
+    def __init__(self, difficulty, blockList=[], blockReward=50):
+       
+        self.blockList = []
+        for elt in blockList:
+            block = Block(elt["index"],elt["previousHash"], elt["nonce"], elt["timestamp"], elt["transactions"], elt["hashVal"], elt["minerName"])
+            self.blockList.append(block)
+        self.transactionPool = []
+        self.difficulty = difficulty
+        self.blockReward = blockReward
+
+# =============================================================================
+#     
+# =============================================================================
+    def createGenesisBlock(self):
+        
+        blk = Block(0,"")
+        transaction = Transaction(self.blockReward, "me", "network", time.time())
+        blk.addTransaction(transaction)
+        nonce = blk.miningFunction(self.difficulty)
+        self.blockList.append(blk)
+
+        
+# =============================================================================
+# 
+# =============================================================================
+    def mineNewBlock(self):
+        
+        lastBlock = self.blockList[-1]
+        index = lastBlock.index + 1
+        previousHash = lastBlock.hashVal
+        blk = Block(index, previousHash)
+        # Fill with transactions
+        for t in self.transactionPool:
+            blk.addTransaction(t)
+        # Clear waiting Transactions
+        self.transactionPool.clear()
+        
+        transaction = Transaction(self.blockReward, "me", "network", time.time())
+        blk.addTransaction(transaction)
+        nonce = blk.miningFunction(self.difficulty)
+        self.blockList.append(blk)
+        
+    
+# =============================================================================
+# 
+# =============================================================================
+    def addBlockFromPeer(self, block):
+        
+        lastBlock = self.blockList[-1]
+        
+        # Check conditions
+        if (block.timestamp < lastBlock.timestamp):
+            print("Timestamp received : " + str(block.timestamp))
+            print("Timestamp last block : " + str(lastBlock.timestamp))
+            raise ValueError("Error timestamp is before timestamp of last block !")
+        if(block.index != lastBlock.index+1):
+            print("Index received : " + str(block.index))
+            print("Index expected : " + str(lastBlock.index + 1))
+            raise ValueError("Error in indexing")
+        if(block.previousHash!=lastBlock.hashVal):
+            print("Previous Hash received : " + str(block.previousHash))
+            print("Previous Hash expected : " + str(lastBlock.hashVal))
+            raise ValueError("Block not aligned in the chain !")
+        if(block.hashVerification(block.nonce)==False):
+            raise ValueError("Block not valid !")
+        
+        # Add block
+        self.blockList.append(block)
+        
+# =============================================================================
+# 
+# =============================================================================
+    def addTransaction(self, sender, receiver, amount):
+        
+        transaction = Transaction(amount, sender, receiver, time.time())
+        self.transactionPool.append(transaction)
+        
+
+# =============================================================================
+# 
+# =============================================================================
+    def verifyChain(self):
+        
+        # Check Genesis Block
+        if self.blockList[0]!=Block(0, ""):
+            return False
+        
+        #  Check Hash
+        for blk in self.blockList:
+            if blk.hashVerification(blk.nonce)==False:
+                return False
+        return True 
+                
+# =============================================================================
+# 
+# =============================================================================
+    def __repr__(self):
+        
+        string = "Block List : " + str(self.blockList) + "\n" + \
+            "Transaction Pool: " + str(self.transactionPool) + "\n" + \
+            "Difficulty: " + str(self.difficulty) + "\n" + \
+            "Block Reward: " + str(self.blockReward) + "\n"
+        return string
+    
+# =============================================================================
+#     
+# =============================================================================
+    def to_dict(self):
+        
+        chain_dict=[]
+        for elem in self.blockList:
+            chain_dict.append(elem.to_dict())
+        return chain_dict
+    
+# =============================================================================
+#     
+# =============================================================================
+    def decode(self):
+        with open('blockchain.json') as file:
+            data = json.load(file)
+        return data
