@@ -60,6 +60,7 @@ ConnectionWrite = Connection()
 # Receive data
 def reading_network():
     global blockchain
+    global wallet
     global ConnectionWrite
     
     while True:
@@ -71,9 +72,11 @@ def reading_network():
             if topic == "chain":
                 
                 if (blockchain and len(blockchain.blockList)<chain_data["length"]) or blockchain is None:
-                    blockchain = Blockchain(difficulty, chain_data["chain"])
                 
-                ConnectionWrite.write_block.emit(str(blockchain.blockList[-1]))
+                        blockchain = Blockchain(difficulty, chain_data["chain"])
+                        ConnectionWrite.write_block.emit(str(blockchain.blockList[-1]))
+                        
+
             
 
 class Chain_Dialog(QtWidgets.QDialog):
@@ -284,14 +287,20 @@ class MyWidget(QtWidgets.QWidget):
     def mine_call(self):
         # need to call the mining function
         global blockchain
+        global wallet
         
         if blockchain==None:
             blockchain = Blockchain(difficulty)
-            blockchain.createGenesisBlock()
+            blockchain.createGenesisBlock(wallet)
+            
             
         else:
-            blockchain.mineNewBlock()
+            blockchain.mineNewBlock(wallet)
             self.define_block(blockchain.blockList[-1])
+            
+            # Check BlockChain
+            if blockchain.verifyChain(wallet)==False:
+                raise ValueError("BlockChain not correct !")
             
             # Send blockchain
             chain = blockchain.to_dict()
@@ -310,6 +319,7 @@ class MyWidget(QtWidgets.QWidget):
 
     def send_tx(self):
         global blockchain
+        global wallet
         # open the tx dialog window
         if blockchain:
             tx_window = Tx_Dialog()
@@ -317,7 +327,7 @@ class MyWidget(QtWidgets.QWidget):
             if ret_val == 1 and blockchain is not None:
                 tx_data = tx_window.get_values()
                 self.define_tx(tx_data)
-                blockchain.addTransaction(address, tx_data["address"], tx_data["amount"])
+                blockchain.addTransaction(tx_data["address"], wallet, tx_data["amount"])
         else:
             msg = QtWidgets.QMessageBox()
             msg.setIcon(QtWidgets.QMessageBox.Warning)

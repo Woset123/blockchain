@@ -14,7 +14,7 @@ class Blockchain:
        
         self.blockList = []
         for elt in blockList:
-            block = Block(elt["index"],elt["previousHash"], elt["nonce"], elt["timestamp"], elt["transactions"], elt["hashVal"], elt["minerName"])
+            block = Block(elt["index"],elt["previousHash"],elt["signature"], elt["nonce"], elt["timestamp"], elt["transactions"], elt["hashVal"], elt["minerName"])
             self.blockList.append(block)
         self.transactionPool = []
         self.difficulty = difficulty
@@ -23,19 +23,19 @@ class Blockchain:
 # =============================================================================
 #     
 # =============================================================================
-    def createGenesisBlock(self):
+    def createGenesisBlock(self, wallet):
         
         blk = Block(0,"")
-        transaction = Transaction(self.blockReward, "me", "network", time.time())
-        blk.addTransaction(transaction)
-        nonce = blk.miningFunction(self.difficulty)
+        transaction = Transaction(self.blockReward, wallet.to_address(), "network", time.time())
+        blk.addTransaction(transaction, wallet)
+        nonce = blk.miningFunction(self.difficulty, wallet)
         self.blockList.append(blk)
 
         
 # =============================================================================
 # 
 # =============================================================================
-    def mineNewBlock(self):
+    def mineNewBlock(self, wallet):
         
         lastBlock = self.blockList[-1]
         index = lastBlock.index + 1
@@ -43,13 +43,13 @@ class Blockchain:
         blk = Block(index, previousHash)
         # Fill with transactions
         for t in self.transactionPool:
-            blk.addTransaction(t)
+            blk.addTransaction(t, wallet)
         # Clear waiting Transactions
         self.transactionPool.clear()
         
-        transaction = Transaction(self.blockReward, "me", "network", time.time())
-        blk.addTransaction(transaction)
-        nonce = blk.miningFunction(self.difficulty)
+        transaction = Transaction(self.blockReward, wallet.to_address(), "network", time.time())
+        blk.addTransaction(transaction, wallet)
+        nonce = blk.miningFunction(self.difficulty, wallet)
         self.blockList.append(blk)
         
     
@@ -82,25 +82,32 @@ class Blockchain:
 # =============================================================================
 # 
 # =============================================================================
-    def addTransaction(self, sender, receiver, amount):
+    def addTransaction(self, receiver, wallet, amount):
         
-        transaction = Transaction(amount, sender, receiver, time.time())
+        transaction = Transaction(amount, wallet.to_address(), receiver, time.time())
         self.transactionPool.append(transaction)
         
 
 # =============================================================================
 # 
 # =============================================================================
-    def verifyChain(self):
+    def verifyChain(self, wallet):
         
+
         # Check Genesis Block
-        if self.blockList[0]!=Block(0, ""):
+        if self.blockList[0].index!=0 or self.blockList[0].previousHash!="":
             return False
         
         #  Check Hash
         for blk in self.blockList:
             if blk.hashVerification(blk.nonce)==False:
                 return False
+     
+        # Check Signature 
+        for blk in self.blockList:
+            if blk.verifyBlockSignature()==False:
+                return False
+            
         return True 
                 
 # =============================================================================
@@ -123,11 +130,3 @@ class Blockchain:
         for elem in self.blockList:
             chain_dict.append(elem.to_dict())
         return chain_dict
-    
-# =============================================================================
-#     
-# =============================================================================
-    def decode(self):
-        with open('blockchain.json') as file:
-            data = json.load(file)
-        return data
